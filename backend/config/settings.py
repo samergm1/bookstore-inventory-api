@@ -155,7 +155,22 @@ EXCHANGE_RATE_API_URL = os.getenv(
 EXCHANGE_RATE_TIMEOUT_SECONDS = float(os.getenv('EXCHANGE_RATE_TIMEOUT_SECONDS', '5'))
 EXCHANGE_RATE_CACHE_SECONDS = int(os.getenv('EXCHANGE_RATE_CACHE_SECONDS', '600'))
 
-PRICING_MARGIN_PERCENTAGE = float(os.getenv("PRICING_MARGIN_PERCENTAGE", "40"))
+PRICING_MARGIN_PERCENTAGE = float(os.getenv('PRICING_MARGIN_PERCENTAGE', '40'))
+
+DEFAULT_LOCAL_CURRENCY = os.getenv('DEFAULT_LOCAL_CURRENCY', 'EUR')
+DEFAULT_EXCHANGE_RATES = {
+    'USD': 1.0,
+    'EUR': 0.85,
+    'GBP': 0.75,
+    'COP': 4000.0,
+    'MXN': 17.0,
+    'ARS': 1000.0,
+    'CLP': 900.0,
+    'PEN': 3.7,
+    'BRL': 5.0,
+    'CAD': 1.35,
+    'JPY': 150.0,
+}
 
 CACHES = {
     'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}

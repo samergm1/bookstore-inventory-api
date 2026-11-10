@@ -15,8 +15,18 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
+from django.http import JsonResponse
+from django.urls import include, path
+
+
+def health(_request):
+    return JsonResponse({'status': 'ok'})
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('health', health, name='health'),
+    path('', include('books.urls')),
 ]
+
+handler404 = 'books.exceptions.json_404'
+handler500 = 'books.exceptions.json_500'

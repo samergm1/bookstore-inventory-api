@@ -1,0 +1,714 @@
+{
+  "info": {
+    "name": "Bookstore Inventory API",
+    "description": "Colección de la API REST de inventario de librerías (Django + DRF).\n\n**Uso:** levanta el backend (`python manage.py runserver 8000`) y ejecuta la colección completa con *Run collection*. Las peticiones están ordenadas: *Crear libro* guarda `bookId` y las demás lo reutilizan.\n\n**Variables:** `baseUrl` (por defecto http://localhost:8000), `bookId`, `isbn` (se genera en cada ejecución).\n\n**Formato de error:** `{\"error\": {\"status\", \"code\", \"message\", \"details\"}}`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "bookId",
+      "value": "1"
+    },
+    {
+      "key": "isbn",
+      "value": "9788437604947"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. CRUD",
+      "item": [
+        {
+          "name": "Crear libro",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/books",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "books"
+              ]
+            },
+            "description": "Crea un libro. Guarda el id devuelto en la variable `bookId`. El ISBN se genera aleatoriamente en el pre-request script.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"El Quijote\",\n  \"author\": \"Miguel de Cervantes\",\n  \"isbn\": \"{{isbn}}\",\n  \"cost_usd\": 15.99,\n  \"stock_quantity\": 25,\n  \"category\": \"Literatura Clásica\",\n  \"supplier_country\": \"ES\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Genera un ISBN-13 aleatorio para que la colección se pueda ejecutar varias veces",
+                  "// sin chocar con la regla de ISBN duplicado.",
+                  "let digits = '978';",
+                  "for (let i = 0; i < 10; i++) digits += Math.floor(Math.random() * 10);",
+                  "pm.collectionVariables.set('isbn', digits);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"bookId\", j.id);",
+                  "pm.test(\"selling_price_local inicia en null\", () => pm.expect(j.selling_price_local).to.be.null);",
+                  "pm.test(\"Devuelve id y timestamps\", () => pm.expect(j).to.include.keys(\"id\", \"created_at\", \"updated_at\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar libros (paginado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/books?page=1&page_size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "books"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Lista paginada. Parámetros: `page` (por defecto 1) y `page_size` (por defecto 10, máximo 100)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Respuesta paginada\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.include.keys(\"count\", \"total_pages\", \"current_page\", \"next\", \"previous\", \"results\");",
+                  "  pm.expect(j.results).to.be.an(\"array\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Obtener libro por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/books/{{bookId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "books",
+                "{{bookId}}"
+              ]
+            },
+            "description": "Detalle de un libro."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Es el libro creado\", () => pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get(\"bookId\"))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Actualizar libro (PUT)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/books/{{bookId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "books",
+                "{{bookId}}"
+              ]
+            },
+            "description": "Actualización completa: se deben enviar todos los campos editables.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Don Quijote de la Mancha\",\n  \"author\": \"Miguel de Cervantes\",\n  \"isbn\": \"{{isbn}}\",\n  \"cost_usd\": 15.99,\n  \"stock_quantity\": 5,\n  \"category\": \"Literatura Clásica\",\n  \"supplier_country\": \"ES\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Stock actualizado\", () => pm.expect(pm.response.json().stock_quantity).to.eql(5));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Actualizar libro parcial (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/books/{{bookId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "books",
+                "{{bookId}}"
+              ]
+            },
+            "description": "Actualización parcial: solo los campos enviados.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stock_quantity\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Stock = 3\", () => pm.expect(pm.response.json().stock_quantity).to.eql(3));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Búsquedas (opcionales)",
+      "item": [
+        {
+          "name": "Buscar por categoría",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/books/search?category=Literatura",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "books",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "Literatura"
+                }
+              ]
+            },
+            "description": "Búsqueda parcial e insensible a mayúsculas en `category`. Respuesta paginada."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Respuesta paginada\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.include.keys(\"count\", \"total_pages\", \"current_page\", \"next\", \"previous\", \"results\");",
+                  "  pm.expect(j.results).to.be.an(\"array\");",
+                  "});",
+                  "pm.test(\"Encuentra al menos 1\", () => pm.expect(pm.response.json().count).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Libros con stock bajo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/books/low-stock?threshold=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "books",
+                "low-stock"
+              ],
+              "query": [
+                {
+                  "key": "threshold",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Libros con `stock_quantity <= threshold` (por defecto 10), ordenados de menor a mayor stock."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Respuesta paginada\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.include.keys(\"count\", \"total_pages\", \"current_page\", \"next\", \"previous\", \"results\");",
+                  "  pm.expect(j.results).to.be.an(\"array\");",
+                  "});",
+                  "pm.test(\"Todos con stock <= 10\", () => pm.response.json().results.forEach(b => pm.expect(b.stock_quantity).to.be.at.most(10)));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Integración externa",
+      "item": [
+        {
+          "name": "Calcular precio de venta",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/books/{{bookId}}/calculate-price",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "books",
+                "{{bookId}}",
+                "calculate-price"
+              ]
+            },
+            "description": "Obtiene la tasa USD → moneda local (según `supplier_country`), aplica un 40% de margen, guarda `selling_price_local` y devuelve el desglose. Si la API externa falla, usa una tasa por defecto (`exchange_rate_source = \"default\"`)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Desglose completo\", () => pm.expect(j).to.include.keys(\"book_id\", \"cost_usd\", \"exchange_rate\", \"cost_local\", \"margin_percentage\", \"selling_price_local\", \"currency\", \"calculation_timestamp\"));",
+                  "pm.test(\"Margen 40%\", () => pm.expect(j.margin_percentage).to.eql(40));",
+                  "pm.test(\"Cálculo correcto\", () => pm.expect(j.selling_price_local).to.be.closeTo(j.cost_local * 1.4, 0.011));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Casos de error",
+      "item": [
+        {
+          "name": "400 - Datos inválidos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/books",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "books"
+              ]
+            },
+            "description": "Viola varias reglas: título vacío, ISBN con formato inválido, cost_usd <= 0, stock negativo y país que no tiene 2 letras.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"\",\n  \"author\": \"Autor\",\n  \"isbn\": \"12345\",\n  \"cost_usd\": -5,\n  \"stock_quantity\": -1,\n  \"category\": \"Test\",\n  \"supplier_country\": \"ESP\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Formato de error uniforme\", () => {",
+                  "  const e = pm.response.json().error;",
+                  "  pm.expect(e).to.include.keys(\"status\", \"code\", \"message\");",
+                  "  pm.expect(e.status).to.eql(pm.response.code);",
+                  "});",
+                  "pm.test(\"Detalle por campo\", () => pm.expect(pm.response.json().error.details).to.include.keys(\"title\", \"isbn\", \"cost_usd\", \"stock_quantity\", \"supplier_country\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "400 - ISBN duplicado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/books",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "books"
+              ]
+            },
+            "description": "Usa el mismo ISBN del libro creado: debe rechazarse.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Duplicado\",\n  \"author\": \"Miguel de Cervantes\",\n  \"isbn\": \"{{isbn}}\",\n  \"cost_usd\": 15.99,\n  \"stock_quantity\": 25,\n  \"category\": \"Literatura Clásica\",\n  \"supplier_country\": \"ES\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Formato de error uniforme\", () => {",
+                  "  const e = pm.response.json().error;",
+                  "  pm.expect(e).to.include.keys(\"status\", \"code\", \"message\");",
+                  "  pm.expect(e.status).to.eql(pm.response.code);",
+                  "});",
+                  "pm.test(\"Error en isbn\", () => pm.expect(pm.response.json().error.details).to.have.property(\"isbn\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "400 - Búsqueda sin categoría",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/books/search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "books",
+                "search"
+              ]
+            },
+            "description": "Falta el parámetro obligatorio `category`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Formato de error uniforme\", () => {",
+                  "  const e = pm.response.json().error;",
+                  "  pm.expect(e).to.include.keys(\"status\", \"code\", \"message\");",
+                  "  pm.expect(e.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "400 - Threshold inválido",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/books/low-stock?threshold=abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "books",
+                "low-stock"
+              ],
+              "query": [
+                {
+                  "key": "threshold",
+                  "value": "abc"
+                }
+              ]
+            },
+            "description": "`threshold` debe ser un entero >= 0."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Formato de error uniforme\", () => {",
+                  "  const e = pm.response.json().error;",
+                  "  pm.expect(e).to.include.keys(\"status\", \"code\", \"message\");",
+                  "  pm.expect(e.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "404 - Libro inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/books/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "books",
+                "999999"
+              ]
+            },
+            "description": "ID que no existe."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Formato de error uniforme\", () => {",
+                  "  const e = pm.response.json().error;",
+                  "  pm.expect(e).to.include.keys(\"status\", \"code\", \"message\");",
+                  "  pm.expect(e.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "404 - Calcular precio de libro inexistente",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/books/999999/calculate-price",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "books",
+                "999999",
+                "calculate-price"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Formato de error uniforme\", () => {",
+                  "  const e = pm.response.json().error;",
+                  "  pm.expect(e).to.include.keys(\"status\", \"code\", \"message\");",
+                  "  pm.expect(e.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Eliminación",
+      "item": [
+        {
+          "name": "Eliminar libro",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/books/{{bookId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "books",
+                "{{bookId}}"
+              ]
+            },
+            "description": "Elimina el libro. Devuelve 204 sin cuerpo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verificar eliminación (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/books/{{bookId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "books",
+                "{{bookId}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
