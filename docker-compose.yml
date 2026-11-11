@@ -1,0 +1,43 @@
+# Frontend (React + Nginx): http://localhost:5173
+# Backend (Django + Gunicorn): http://localhost:8000
+# docker compose up --build
+
+services:
+  backend:
+    build: ./backend
+    container_name: bookstore-backend
+    ports:
+      - "8000:8000"
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-docker-dev-secret-change-me}
+      DJANGO_DEBUG: "False"
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,backend
+      CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      EXCHANGE_RATE_API_URL: https://api.exchangerate-api.com/v4/latest/USD
+      DEFAULT_LOCAL_CURRENCY: EUR
+      PRICING_MARGIN_PERCENTAGE: "40"
+    volumes:
+      - backend-data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:8000
+    container_name: bookstore-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  backend-data:

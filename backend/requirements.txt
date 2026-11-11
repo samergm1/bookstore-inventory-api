@@ -3,3 +3,6 @@ djangorestframework>=3.15,<3.16
 django-cors-headers>=4.4,<5
 requests>=2.32,<3
 python-dotenv>=1.0,<2
+# Production / Docker
+gunicorn>=23,<24
+whitenoise>=6.7,<7
