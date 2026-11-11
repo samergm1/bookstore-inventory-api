@@ -2,6 +2,8 @@ from decimal import Decimal
 from django.db.models import Value
 from django.db.models.functions import Replace, Upper
 from rest_framework import serializers
+
+from .services.pricing_service import currency_for_country
 from .models import Book
 from .validators import is_valid_isbn_format, normalize_isbn
 
@@ -10,6 +12,7 @@ class BookSerializer(serializers.ModelSerializer):
     cost_usd = serializers.DecimalField(max_digits=10, decimal_places=2, coerce_to_string=False)
     selling_price_local = serializers.DecimalField(max_digits=14, decimal_places=2, coerce_to_string=False, read_only=True)
     stock_quantity = serializers.IntegerField()
+    currency = serializers.SerializerMethodField()
 
     class Meta:
         model = Book
@@ -20,14 +23,18 @@ class BookSerializer(serializers.ModelSerializer):
             'isbn',
             'cost_usd',
             'selling_price_local',
+            'currency',
             'stock_quantity',
             'category',
             'supplier_country',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'selling_price_local', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'selling_price_local', 'currency', 'created_at', 'updated_at']
         extra_kwargs = {'isbn': {'validators': []}}
+        
+    def get_currency(self, obj: Book):
+        return currency_for_country(obj.supplier_country)
 
     def validate_title(self, value: str) -> str:
         value = value.strip()
